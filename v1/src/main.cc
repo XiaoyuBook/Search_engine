@@ -1,14 +1,26 @@
 #include "../include/file_scanner.h"
 #include "../include/file_parse.h"
 
-
+#define TYPE_CN 1
+#define TYPE_EN 2
 
 int main() {
-    file_scanner scanner("../corpus/CN/");
-    scanner.start();
-    auto filename = scanner.get_files();
-    file_parse fp(filename,"./output.txt");
-    fp.start();
-    fp.file_filter("../corpus/stopwords/cn_stopwords.txt");
+    file_scanner cn_scanner("../corpus/CN");
+    cn_scanner.start();
+    auto cn_filename = cn_scanner.get_files();
+    file_parse cn(cn_filename,"./cnoutput.txt");
+    cn.start(1);
+    cn.file_filter("../stopwords/cn_stopwords.txt", TYPE_CN);
+    cn.count_words("dict_cn");
+    std::cout << "cn finished!" << std::endl;
+
+    file_scanner en_scanner("../corpus/EN");
+    en_scanner.start();
+    auto en_filename = en_scanner.get_files();
+    file_parse en(en_filename,"./enoutput.txt");
+    en.start(2);
+    cn.file_filter("../stopwords/en_stopwords.txt", TYPE_EN);
+    en.count_words("dict_en");
+    std::cout << "en finished" << std::endl;
     return 0;
 }

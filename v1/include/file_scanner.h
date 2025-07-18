@@ -18,6 +18,7 @@ public:
     file_scanner(const char *scanner_path);
     ~file_scanner();
 
+
     void start();
     const std::vector<std::string>& get_files() const;
 
