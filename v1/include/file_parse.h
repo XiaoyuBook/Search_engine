@@ -9,7 +9,7 @@ using std::string;
 std::string trim(const std::string& s);
 
 string contains_alpha(const string &s);
-bool contains_alpha_or_digit(const std::string& str);
+bool contains_non_chinese(const std::string& str);
 class file_parse {
 
 public:
@@ -26,7 +26,8 @@ public:
     void file_filter(const string& path, const int &flag);
     // 统计频率
     void count_words(const string& path);
-
+    // 生成索引
+    void create_index(const string & intput_path, const string & output_path);
 
 private:
   

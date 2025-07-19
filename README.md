@@ -5,4 +5,5 @@
 > 1. mv ./cppjieba/include/cppjieba /usr/local/include/
 > 2. mv ./cppjieba/deps/limonp/include/limonp /usr/local/include/cppjieba
 > utf8
-> 1. mv ./utfcpp/source/* /usr/local/include/utfcpp
+> tar xzvf simhash-1.3.0.tar.gz
+> sudo mv ./simhash-1.3.0/include/* /usr/local/include

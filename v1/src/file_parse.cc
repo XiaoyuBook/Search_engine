@@ -1,7 +1,11 @@
 #include "../include/file_parse.h"
 #include <cctype>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
+#include <istream>
+#include <iterator>
 #include <pthread.h>
 #include <sstream>
 #include <iostream>
@@ -9,6 +13,8 @@
 #include <map>
 #include <string>
 #include <ctype.h>
+#include <utfcpp/utf8/checked.h>
+#include <vector>
 
 #include "utfcpp/utf8.h"
 
@@ -93,11 +99,31 @@ std::string trim(const std::string& s) {
 }
 
 // 检查是否有英文或者数字
-bool contains_alpha_or_digit(string& str) {
-    for (char c : str) {
-        if (std::isalnum(static_cast<unsigned char>(c))) {
-            return true;
+bool contains_non_chinese(const std::string& str) {
+    try {
+        auto it = str.begin();
+        auto end = str.end();
+        while (it != end) {
+            uint32_t code_point = utf8::next(it, end);
+            
+            // 中文字符的Unicode范围: 0x4E00-0x9FFF, 0x3400-0x4DBF, 0x20000-0x2A6DF, 0x2A700-0x2B73F, etc.
+            bool is_chinese = (code_point >= 0x4E00 && code_point <= 0x9FFF) || 
+                             (code_point >= 0x3400 && code_point <= 0x4DBF) ||
+                             (code_point >= 0x20000 && code_point <= 0x2A6DF) ||
+                             (code_point >= 0x2A700 && code_point <= 0x2B73F) ||
+                             (code_point >= 0x2B740 && code_point <= 0x2B81F) ||
+                             (code_point >= 0x2B820 && code_point <= 0x2CEAF) ||
+                             (code_point >= 0xF900 && code_point <= 0xFAFF) ||
+                             (code_point >= 0x2F800 && code_point <= 0x2FA1F);
+            
+            // ASCII字母、数字或非中文字符
+            if ((code_point < 0x80 && std::isalnum(code_point)) || !is_chinese) {
+                return true;
+            }
         }
+    } catch (const utf8::exception&) {
+        // 无效的UTF-8序列
+        return true;
     }
     return false;
 }
@@ -131,7 +157,7 @@ void file_parse::file_filter(const string& stopwords_path, const int & flag) {
         while (getline(ifs_o, line)) {
             string clean_line = trim(line);
             if(clean_line.empty()) continue;
-            if (stopwords.find(clean_line) == stopwords.end() && !contains_alpha_or_digit(clean_line)) {
+            if (stopwords.find(clean_line) == stopwords.end() && !contains_non_chinese(clean_line)) {
                 temp << clean_line << "\n";
             }
         }
@@ -174,7 +200,10 @@ void file_parse::output_file(const std::vector<string>& words,const string& file
     }
     
     for (const auto& word : words) {
-        outfile << word << "\n";
+        string clean_word = trim(word);
+        if (!clean_word.empty()) {
+            outfile << clean_word << "\n";
+        }
     }
     outfile.close();
 }
@@ -193,7 +222,11 @@ void file_parse::count_words(const string & path){
     map<string, int> count;
     string line;
     while(getline(ifs, line)) {
-        count[line]++;
+        string clean = trim(line);
+        if (!clean.empty()){
+            count[line]++;
+        }
+        
     }
     ifs.close();
 
@@ -202,4 +235,61 @@ void file_parse::count_words(const string & path){
     for(auto &[key,value] : count) {
         count_file << key << " " << value << "\n";
     }
+}
+
+// 去重
+std::set<string> unique_char(const string & line) {
+    std::set<string> chars;
+    const char * it = line.c_str();
+    const char* end = line.c_str() + line.size();
+
+    while(it != end) {
+        auto start = it;
+        utf8::next(it,end);
+        string words = string{start, it};
+        chars.insert(words);
+    }
+    return chars;
+}
+
+// 生成对应的行索引:中文
+void file_parse::create_index(const string & input_path,const string & output_path) {
+    std::ifstream infile(input_path);
+    if(!infile) {
+        std::cerr<< "failed to open DICT_CN !" << std::endl;
+        return;
+    }
+    // uint32_t是用来unicode的，实际就是左边汉字，右边行号
+    std::map<string , std::vector<int>> char_index;
+    string line;
+    // 行号从第一行开始
+    int line_number = 1;
+    while(getline(infile, line)) {
+        auto words = unique_char(line);
+        for(const auto & e : words) {
+            if (!contains_non_chinese(e)) {
+                char_index[e].push_back(line_number);
+            }
+        }
+        // 每行处理完进行行号加一
+        line_number++;
+    }
+    infile.close();
+        // 到这里已经把所有数据放到char_index了，生成文件即可
+
+        std::ofstream out(output_path);
+        if(!out) {
+            std::cerr << "failed to open INDEX_FILE"<< std::endl;
+            return;
+        }
+
+        for(const auto & [ch, index]: char_index) {
+            out << ch << " ";
+
+            for(int num : index){
+                out <<  num << " ";
+            }
+            out  << "\n";
+        }
+        out.close();
 }
