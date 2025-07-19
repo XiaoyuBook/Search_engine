@@ -60,13 +60,14 @@ void file_parse::cn_parse(const string& path) {
     output_file(words, m_output_file_path);
 }
 
-bool contains_digit(const string &s){
+string contains_alpha(const string &s){
+    string result;
     for(char e : s) {
-        if(isdigit(static_cast<unsigned char>(e))) {
-            return true;
+        if(isalpha(static_cast<unsigned char>(e))) {
+            result += e;
         }
     }
-    return false;
+    return result;
 }
 // 英文分词
 void file_parse::en_parse(const string &path) {
@@ -77,7 +78,7 @@ void file_parse::en_parse(const string &path) {
     string word;
     std::istringstream iss{content};
     while(iss >> word) {
-        words.push_back(word);
+        words.push_back(contains_alpha(word));
     }
     
     output_file(words, m_output_file_path);
@@ -92,7 +93,7 @@ std::string trim(const std::string& s) {
 }
 
 // 检查是否有英文或者数字
-bool contains_alpha_or_digit(const std::string& str) {
+bool contains_alpha_or_digit(string& str) {
     for (char c : str) {
         if (std::isalnum(static_cast<unsigned char>(c))) {
             return true;
@@ -145,7 +146,7 @@ void file_parse::file_filter(const string& stopwords_path, const int & flag) {
         while (getline(ifs_o, line)) {
             string clean_line = trim(line);
             if(clean_line.empty()) continue;
-            if(contains_digit(line)) continue;
+            // if(!contains_alpha(line)) continue;
             if (stopwords.find(clean_line) == stopwords.end()) {
                 temp << clean_line << "\n";
             }

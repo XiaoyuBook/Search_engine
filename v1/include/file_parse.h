@@ -8,6 +8,7 @@ using std::string;
 
 std::string trim(const std::string& s);
 
+string contains_alpha(const string &s);
 bool contains_alpha_or_digit(const std::string& str);
 class file_parse {
 

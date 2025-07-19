@@ -19,7 +19,7 @@ int main() {
     auto en_filename = en_scanner.get_files();
     file_parse en(en_filename,"./enoutput.txt");
     en.start(2);
-    cn.file_filter("../stopwords/en_stopwords.txt", TYPE_EN);
+    en.file_filter("../stopwords/en_stopwords.txt", TYPE_EN);
     en.count_words("dict_en");
     std::cout << "en finished" << std::endl;
     return 0;
