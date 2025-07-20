@@ -56,15 +56,70 @@ string file_parse::get_content(const string& path) {
     return buf.str();
 }
 
-// 中文分词
+// 中文分词(老版本的)
+// void file_parse::cn_parse(const string& path) {
+//     string content = get_content(path);
+//     if (content.empty()) return;
+
+//     std::vector<string> words;
+//     m_tokenizer.Cut(content, words);
+//     output_file(words, m_output_file_path);
+// }
+
+string  extract_content_from_item(const string & item){
+    size_t content_start = item.find("<content>");
+    if(content_start == string::npos) return "";
+    size_t content_end = item.find("</content>");
+    if(content_end == string::npos) return "";
+    return item.substr(content_start+9, content_end- (content_start + 9));
+}
+
+string extract_description_from_item(const string & item) {
+    size_t content_start = item.find("<description>");
+    if(content_start == string::npos) return "";
+    size_t content_end = item.find("</description>");
+    if(content_end == string::npos) return "";
+    return item.substr(content_start+13, content_end- (content_start + 13));
+}
+
+string extract_p(const string& html) {
+    size_t p_start = html.find("<p");
+    if (p_start == string::npos) return "";
+    size_t p_tag_end = html.find(">", p_start);
+    if (p_tag_end == string::npos) return "";
+    size_t p_close = html.find("</p>", p_tag_end);
+    if (p_close == string::npos) return "";
+    return html.substr(p_tag_end + 1, p_close - (p_tag_end + 1));
+}
+
+
+// 中文分词（新版本：增加对网页内容的解析)
 void file_parse::cn_parse(const string& path) {
     string content = get_content(path);
-    if (content.empty()) return;
-
     std::vector<string> words;
-    m_tokenizer.Cut(content, words);
-    output_file(words, m_output_file_path);
+    size_t pos = 0;
+    while(1) {
+        size_t item_start = content.find("<item>", pos);
+        if(item_start == string::npos) break;
+        size_t item_end = content.find("</item>", item_start + 6);
+        string item = content.substr(item_start +6, item_end -( item_start +6));
+        string clean_item = extract_content_from_item(item);
+        string clean_item2 = extract_description_from_item(item);
+        if(clean_item != "") {
+            m_tokenizer.Cut(extract_p(clean_item),words);
+        } else if(clean_item2 != ""){
+            m_tokenizer.Cut(extract_p(clean_item2),words);
+        } else {
+            pos = item_start+7;
+            continue;
+        }
+        pos = item_end+7;
+    }
+    
+    output_file(words,m_output_file_path);
 }
+
+
 
 string contains_alpha(const string &s){
     string result;

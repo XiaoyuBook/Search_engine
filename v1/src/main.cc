@@ -5,7 +5,7 @@
 #define TYPE_EN 2
 
 int main() {
-    file_scanner cn_scanner("../corpus/CN");
+    file_scanner cn_scanner("../corpus/webpages");
     cn_scanner.start();
     auto cn_filename = cn_scanner.get_files();
     file_parse cn(cn_filename,"./cnoutput.txt");
