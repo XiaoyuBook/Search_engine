@@ -15,6 +15,9 @@
 #include <ctype.h>
 #include <utfcpp/utf8/checked.h>
 #include <vector>
+#include <utility>
+#include <tinyxml2.h>
+
 
 #include "utfcpp/utf8.h"
 
@@ -24,12 +27,22 @@
 using std::string;
 using std::unordered_set;
 using std::map;
+using std::string;
+using std::vector;
+using std::pair;
 
 
 
-
-file_parse::file_parse(const std::vector<string>& file_array,const string & output_file_path)
-    : m_file_array(std::move(file_array)),m_output_file_path(output_file_path) {
+file_parse::file_parse(
+    const std::vector<string>& file_array,
+    const string & output_file_path,
+    const string& offset_file_path,
+    const string & weblib_path
+)
+    : m_file_array(std::move(file_array)),
+    m_output_file_path(output_file_path),
+    m_offset_file_path(offset_file_path),
+    m_weblib_path(weblib_path){
         // 构造函数每次先把文件清空
         std::ofstream(m_output_file_path, std::ios::trunc).close();
     }
@@ -43,7 +56,7 @@ void file_parse::start(const int & flag) {
     }
 }
 
-// 获取文件内容（中英通用）
+// 获取文件内容到内存区中（中英通用）
 string file_parse::get_content(const string& path) {
     std::ifstream ifs(path);
     if (!ifs) {
@@ -65,22 +78,25 @@ string file_parse::get_content(const string& path) {
 //     m_tokenizer.Cut(content, words);
 //     output_file(words, m_output_file_path);
 // }
+// 下面换成tinyxm2实现
+// 从item中获取
+// string  extract_content_from_item(const string & item){
+//     size_t content_start = item.find("<content>");
+//     if(content_start == string::npos) return "";
+//     size_t content_end = item.find("</content>");
+//     if(content_end == string::npos) return "";
+//     return item.substr(content_start+9, content_end- (content_start + 9));
+// }
+// // 从description中获取
+// string extract_description_from_item(const string & item) {
+//     size_t content_start = item.find("<description>");
+//     if(content_start == string::npos) return "";
+//     size_t content_end = item.find("</description>");
+//     if(content_end == string::npos) return "";
+//     return item.substr(content_start+13, content_end- (content_start + 13));
+// }
+// 从p中获取
 
-string  extract_content_from_item(const string & item){
-    size_t content_start = item.find("<content>");
-    if(content_start == string::npos) return "";
-    size_t content_end = item.find("</content>");
-    if(content_end == string::npos) return "";
-    return item.substr(content_start+9, content_end- (content_start + 9));
-}
-
-string extract_description_from_item(const string & item) {
-    size_t content_start = item.find("<description>");
-    if(content_start == string::npos) return "";
-    size_t content_end = item.find("</description>");
-    if(content_end == string::npos) return "";
-    return item.substr(content_start+13, content_end- (content_start + 13));
-}
 
 string extract_p(const string& html) {
     size_t p_start = html.find("<p");
@@ -93,31 +109,200 @@ string extract_p(const string& html) {
 }
 
 
-// 中文分词（新版本：增加对网页内容的解析)
-void file_parse::cn_parse(const string& path) {
-    string content = get_content(path);
-    std::vector<string> words;
-    size_t pos = 0;
-    while(1) {
-        size_t item_start = content.find("<item>", pos);
-        if(item_start == string::npos) break;
-        size_t item_end = content.find("</item>", item_start + 6);
-        string item = content.substr(item_start +6, item_end -( item_start +6));
-        string clean_item = extract_content_from_item(item);
-        string clean_item2 = extract_description_from_item(item);
-        if(clean_item != "") {
-            m_tokenizer.Cut(extract_p(clean_item),words);
-        } else if(clean_item2 != ""){
-            m_tokenizer.Cut(extract_p(clean_item2),words);
-        } else {
-            pos = item_start+7;
-            continue;
-        }
-        pos = item_end+7;
+
+
+// 提取content并且去重
+std::vector<DocMeta> file_parse::generate_unique_docs(const std::string& file_path) {
+    using namespace tinyxml2;
+
+    XMLDocument doc;
+    std::vector<DocMeta> docs;
+    std::unordered_set<uint64_t> simhash_set;  // 用于内容去重
+
+    if (doc.LoadFile(file_path.c_str()) != XML_SUCCESS) {
+        std::cerr << "Error: Failed to load XML file: " << file_path << std::endl;
+        return docs;
     }
-    
-    output_file(words,m_output_file_path);
+
+    XMLElement* rss = doc.FirstChildElement("rss");
+    if (!rss) {
+        std::cerr << "Error: <rss> element not found in " << file_path << std::endl;
+        return docs;
+    }
+
+    XMLElement* channel = rss->FirstChildElement("channel");
+    if (!channel) {
+        std::cerr << "Error: <channel> element not found in " << file_path << std::endl;
+        return docs;
+    }
+
+    XMLElement* item = channel->FirstChildElement("item");
+    int total_items = 0;
+    int unique_docs = 0;
+
+    while (item) {
+        total_items++;
+        DocMeta meta;
+
+        // 提取元数据
+        if (XMLElement* id = item->FirstChildElement("id")) 
+            meta.id = id->GetText() ? id->GetText() : "";
+
+        if (XMLElement* link = item->FirstChildElement("link"))
+            meta.link = link->GetText() ? link->GetText() : "";
+
+        if (XMLElement* title = item->FirstChildElement("title"))
+            meta.title = title->GetText() ? title->GetText() : "";
+
+        // 提取内容优先content，没有则description
+        std::string raw_content;
+        if (XMLElement* content = item->FirstChildElement("content")) {
+            raw_content = content->GetText() ? content->GetText() : "";
+        } else if (XMLElement* desc = item->FirstChildElement("description")) {
+            raw_content = desc->GetText() ? desc->GetText() : "";
+        } else {
+            item = item->NextSiblingElement("item");
+            continue; // 没有内容跳过
+        }
+
+        meta.content = extract_p(raw_content);
+
+        uint64_t hashcode;
+        m_hasher.make(meta.content, 3, hashcode);
+
+        bool is_duplicate = false;
+        for (const auto& existing_hash : simhash_set) {
+            if (m_hasher.isEqual(existing_hash, hashcode)) {
+                is_duplicate = true;
+                break;
+            }
+        }
+        if (!is_duplicate) {
+            simhash_set.insert(hashcode);
+            meta.size = 11 + meta.content.size() + 7;
+            docs.push_back(meta);
+            unique_docs++;
+        }
+
+        item = item->NextSiblingElement("item");
+    }
+
+  
+    return docs;
 }
+
+// 生成网页库文件
+void file_parse::output_weblib(std::vector<DocMeta> & docs){
+    std::ofstream ofs(m_weblib_path);
+    if (!ofs) {
+        std::cerr << "Error: Failed to open weblib file: " << m_weblib_path << std::endl;
+        return;
+    }
+        int doc_id = 1;
+        for (const auto& doc : docs) {
+            ofs << "<doc>\n";
+            ofs << "  <docid>" << doc_id++ << "</docid>\n";
+            ofs << "  <title>" << doc.title << "</title>\n";
+            ofs << "  <link>" << doc.link << "</link>\n";
+            ofs << "  <content>" << doc.content << "</content>\n";
+            ofs << "</doc>\n\n";
+        }
+    ofs.close();
+}
+
+// 生成偏移文件
+void file_parse::output_offset(std::vector<DocMeta> & docs){
+    std::ofstream ofs(m_offset_file_path);
+    if (!ofs) {
+        std::cerr << "Error: Failed to open offset file: " << m_offset_file_path << std::endl;
+        return;
+    }
+    int doc_id = 1;
+    size_t offset = 0;
+    for (const auto& doc : docs) {
+        ofs << doc_id++ <<" "<< offset  << " " << doc.size << std::endl;
+        offset += doc.size; 
+    }
+    ofs.close();
+}
+
+// 生成关键字文档：用jieba分词器
+void file_parse::output_keyword(std::vector<DocMeta> &docs) {
+    std::vector<string> words; 
+    for (const auto& doc : docs) {
+        m_tokenizer.Cut(doc.content, words);
+    }
+    output_file(words, m_output_file_path);
+
+}
+
+
+void file_parse::cn_parse(const string& path) {
+    auto docs = generate_unique_docs(path);
+    std::cout << "generate_unique_docs returned " << docs.size() << " docs" << std::endl;
+    output_weblib(docs);
+    output_offset(docs);
+    output_keyword(docs);
+
+}
+
+// 中文分词（新版本：增加对网页内容的解析)( 没用tinyxm2,现已抛弃)
+// void file_parse::cn_parse(const string& path) {
+//     string content = get_content(path);
+//     std::vector<string> words;
+
+//     std::stringstream offset_output;
+//     std::vector<offset_info> offsets;
+
+//     int doc_id = 1;
+//     size_t pos = 0;
+//     int cur_offset = 0;
+//     while(1) {
+//         size_t item_start = content.find("<item>", pos);
+//         if(item_start == string::npos) break;
+//         size_t item_end = content.find("</item>", item_start + 6);
+//         string item = content.substr(item_start +6, item_end -( item_start +6));
+//         string clean_item = extract_content_from_item(item);
+//         string clean_item2 = extract_description_from_item(item);
+//         if(clean_item != "") {
+//             m_tokenizer.Cut(extract_p(clean_item),words);
+//         } else if(clean_item2 != ""){
+//             m_tokenizer.Cut(extract_p(clean_item2),words);
+//         } else {
+//             pos = item_start+7;
+//             continue;
+//         }
+
+
+
+//             // 增加偏移量
+//         std::stringstream ss;
+//         for(const auto & word:words) {
+//             ss << word << " ";
+//         }
+//         string item_text = ss.str();
+//         int size = item_text.size();
+//         offset_output << item_text;
+//         offset_info oi{doc_id, cur_offset, size};
+//         offsets.push_back(oi);
+//         cur_offset += size;
+//         doc_id++;
+        
+//         pos = item_end+7;
+
+//     }
+    
+//         // 写入偏移量文件
+//         std::ofstream ofs_offset(m_offset_file_path);
+//         for (const auto& info : offsets) {
+//             ofs_offset << info.id << " " << info.offset << " " << info.size << "\n";
+//         }
+//         ofs_offset.close();
+
+
+   
+//     output_file(words,m_output_file_path);
+// }
 
 
 
