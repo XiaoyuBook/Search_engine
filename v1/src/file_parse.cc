@@ -7,6 +7,7 @@
 #include <istream>
 #include <iterator>
 #include <pthread.h>
+#include <regex>
 #include <sstream>
 #include <iostream>
 #include <unordered_set>
@@ -17,7 +18,7 @@
 #include <vector>
 #include <utility>
 #include <tinyxml2.h>
-
+#include <regex>
 
 #include "utfcpp/utf8.h"
 
@@ -98,14 +99,28 @@ string file_parse::get_content(const string& path) {
 // 从p中获取
 
 
+
+string strip_tags(const string& input) {
+    using namespace std;
+    static const regex tag("<[^>]*>");
+    return regex_replace(input, tag, "");
+}
+
 string extract_p(const string& html) {
-    size_t p_start = html.find("<p");
-    if (p_start == string::npos) return "";
-    size_t p_tag_end = html.find(">", p_start);
-    if (p_tag_end == string::npos) return "";
-    size_t p_close = html.find("</p>", p_tag_end);
-    if (p_close == string::npos) return "";
-    return html.substr(p_tag_end + 1, p_close - (p_tag_end + 1));
+    using namespace std;
+    string result;
+    regex p_regex("<p[^>]*>(.*?)</p>", regex::icase); // 匹配所有<p>...</p>
+    auto begin = sregex_iterator(html.begin(), html.end(), p_regex);
+    auto end = sregex_iterator();
+
+    for (auto it = begin; it != end; ++it) {
+        string inner = it->str(1); // 提取 p 内的内容
+        if (inner.find("<img") != string::npos) continue; // 跳过包含图片的 p
+        result += strip_tags(inner); // 去掉内部的 <span> 等标签
+        result += "\n";
+    }
+
+    return result;
 }
 
 
@@ -119,27 +134,25 @@ std::vector<DocMeta> file_parse::generate_unique_docs(const std::string& file_pa
     std::vector<DocMeta> docs;
     std::unordered_set<uint64_t> simhash_set;  // 用于内容去重
 
+
+    // 处理根径标签
     if (doc.LoadFile(file_path.c_str()) != XML_SUCCESS) {
         std::cerr << "Error: Failed to load XML file: " << file_path << std::endl;
         return docs;
     }
-
-    XMLElement* rss = doc.FirstChildElement("rss");
+     XMLElement* rss = doc.FirstChildElement("rss");
     if (!rss) {
         std::cerr << "Error: <rss> element not found in " << file_path << std::endl;
         return docs;
     }
-
     XMLElement* channel = rss->FirstChildElement("channel");
     if (!channel) {
         std::cerr << "Error: <channel> element not found in " << file_path << std::endl;
         return docs;
     }
-
     XMLElement* item = channel->FirstChildElement("item");
     int total_items = 0;
     int unique_docs = 0;
-
     while (item) {
         total_items++;
         DocMeta meta;
@@ -156,16 +169,19 @@ std::vector<DocMeta> file_parse::generate_unique_docs(const std::string& file_pa
 
         // 提取内容优先content，没有则description
         std::string raw_content;
-        if (XMLElement* content = item->FirstChildElement("content")) {
-            raw_content = content->GetText() ? content->GetText() : "";
-        } else if (XMLElement* desc = item->FirstChildElement("description")) {
-            raw_content = desc->GetText() ? desc->GetText() : "";
+        XMLElement* content = item->FirstChildElement("content");
+        if (content && content->GetText()) {
+            raw_content = content->GetText();  // 直接拿纯文本
         } else {
-            item = item->NextSiblingElement("item");
-            continue; // 没有内容跳过
+            XMLElement* desc = item->FirstChildElement("description");
+            if (desc && desc->GetText()) {
+                raw_content = desc->GetText();
+            } else {
+                item = item->NextSiblingElement("item");
+                continue;
+            }
         }
-
-        meta.content = extract_p(raw_content);
+        meta.content = raw_content;
 
         uint64_t hashcode;
         m_hasher.make(meta.content, 3, hashcode);
@@ -190,15 +206,15 @@ std::vector<DocMeta> file_parse::generate_unique_docs(const std::string& file_pa
   
     return docs;
 }
-
+int doc_id = 1;
 // 生成网页库文件
-void file_parse::output_weblib(std::vector<DocMeta> & docs){
+void file_parse::output_weblib(std::vector<DocMeta> & docs){ 
     std::ofstream ofs(m_weblib_path);
     if (!ofs) {
         std::cerr << "Error: Failed to open weblib file: " << m_weblib_path << std::endl;
         return;
     }
-        int doc_id = 1;
+
         for (const auto& doc : docs) {
             ofs << "<doc>\n";
             ofs << "  <docid>" << doc_id++ << "</docid>\n";
@@ -239,7 +255,7 @@ void file_parse::output_keyword(std::vector<DocMeta> &docs) {
 
 void file_parse::cn_parse(const string& path) {
     auto docs = generate_unique_docs(path);
-    std::cout << "generate_unique_docs returned " << docs.size() << " docs" << std::endl;
+    std::cout<<path << ":generate_unique_docs returned " << docs.size() << " docs" << std::endl;
     output_weblib(docs);
     output_offset(docs);
     output_keyword(docs);
