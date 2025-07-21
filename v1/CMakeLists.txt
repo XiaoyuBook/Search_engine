@@ -12,6 +12,7 @@ add_executable(words_count
     src/main.cc
     src/file_scanner.cc
     src/file_parse.cc
+    src/web_parse.cc
 )
 
 find_package(tinyxml2 REQUIRED)   # 找系统安装的tinyxml2

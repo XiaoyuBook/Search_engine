@@ -1,0 +1,206 @@
+#include "../include/web_parse.h"
+#include "../include/utils.h"
+
+using std::string;
+
+
+
+
+
+web_parse::web_parse(const string & offset_filepath, const string & weblib_filepath,const string & keyword_filepath):
+        m_offset_filepath(offset_filepath),
+        m_weblib_filepath(weblib_filepath),
+        m_keyword_filepath(keyword_filepath){
+            // 构造函数每次先把文件清空
+            std::ofstream(m_offset_filepath, std::ios::trunc).close();
+            std::ofstream(m_weblib_filepath, std::ios::trunc).close();
+            std::ofstream(m_keyword_filepath, std::ios::trunc).close();
+        }
+
+
+string strip_tags(const string& input) {
+    using namespace std;
+    static const regex tag("<[^>]*>");
+    return regex_replace(input, tag, "");
+}
+
+string extract_p(const string& html) {
+    using namespace std;
+    string result;
+    regex p_regex("<p[^>]*>(.*?)</p>", regex::icase); // 匹配所有<p>...</p>
+    auto begin = sregex_iterator(html.begin(), html.end(), p_regex);
+    auto end = sregex_iterator();
+
+    for (auto it = begin; it != end; ++it) {
+        string inner = it->str(1); // 提取 p 内的内容
+        if (inner.find("<img") != string::npos) continue; // 跳过包含图片的 p
+        result += strip_tags(inner); // 去掉内部的 <span> 等标签
+        result += "\n";
+    }
+
+    return result;
+}
+
+
+// 提取content并且去重
+std::vector<DocMeta> web_parse::generate_unique_docs(const string& file_path) {
+    using namespace tinyxml2;
+
+    XMLDocument doc;
+    std::vector<DocMeta> docs;
+    std::unordered_set<uint64_t> simhash_set;  // 用于内容去重
+
+
+    // 处理根径标签
+    if (doc.LoadFile(file_path.c_str()) != XML_SUCCESS) {
+        std::cerr << "Error: Failed to load XML file: " << file_path << std::endl;
+        return docs;
+    }
+     XMLElement* rss = doc.FirstChildElement("rss");
+    if (!rss) {
+        std::cerr << "Error: <rss> element not found in " << file_path << std::endl;
+        return docs;
+    }
+    XMLElement* channel = rss->FirstChildElement("channel");
+    if (!channel) {
+        std::cerr << "Error: <channel> element not found in " << file_path << std::endl;
+        return docs;
+    }
+    XMLElement* item = channel->FirstChildElement("item");
+    int total_items = 0;
+    int unique_docs = 0;
+    while (item) {
+        total_items++;
+        DocMeta meta;
+
+        // 提取元数据
+        if (XMLElement* id = item->FirstChildElement("id")) 
+            meta.id = id->GetText() ? id->GetText() : "";
+
+        if (XMLElement* link = item->FirstChildElement("link"))
+            meta.link = link->GetText() ? link->GetText() : "";
+
+        if (XMLElement* title = item->FirstChildElement("title"))
+            meta.title = title->GetText() ? title->GetText() : "";
+
+        // 提取内容优先content，没有则description
+        std::string raw_content;
+        XMLElement* content = item->FirstChildElement("content");
+        if (content && content->GetText()) {
+            raw_content = content->GetText();  // 直接拿纯文本
+        } else {
+            XMLElement* desc = item->FirstChildElement("description");
+            if (desc && desc->GetText()) {
+                raw_content = desc->GetText();
+            } else {
+                item = item->NextSiblingElement("item");
+                continue;
+            }
+        }
+        meta.content = raw_content;
+
+        uint64_t hashcode;
+        m_hasher.make(meta.content, 3, hashcode);
+
+        bool is_duplicate = false;
+        for (const auto& existing_hash : simhash_set) {
+            if (m_hasher.isEqual(existing_hash, hashcode)) {
+                is_duplicate = true;
+                break;
+            }
+        }
+        if (!is_duplicate) {
+            simhash_set.insert(hashcode);
+            meta.size = 11 + meta.content.size() + 7;
+            docs.push_back(meta);
+            unique_docs++;
+        }
+
+        item = item->NextSiblingElement("item");
+    }
+
+  
+    return docs;
+}
+
+
+
+
+int doc_id = 1;
+// 生成网页库文件
+void web_parse::output_weblib(std::vector<DocMeta> & docs){ 
+    std::ofstream ofs(m_weblib_filepath);
+    if (!ofs) {
+        std::cerr << "Error: Failed to open weblib file: " << m_weblib_filepath << std::endl;
+        return;
+    }
+
+        for (const auto& doc : docs) {
+            ofs << "<doc>\n";
+            ofs << "  <docid>" << doc_id++ << "</docid>\n";
+            ofs << "  <title>" << doc.title << "</title>\n";
+            ofs << "  <link>" << doc.link << "</link>\n";
+            ofs << "  <content>" << doc.content << "</content>\n";
+            ofs << "</doc>\n\n";
+        }
+    ofs.close();
+}
+
+// 生成偏移文件
+void web_parse::output_offset(std::vector<DocMeta> & docs){
+    std::ofstream ofs(m_offset_filepath);
+    if (!ofs) {
+        std::cerr << "Error: Failed to open offset file: " << m_offset_filepath << std::endl;
+        return;
+    }
+    int doc_id = 1;
+    size_t offset = 0;
+    for (const auto& doc : docs) {
+        ofs << doc_id++ <<" "<< offset  << " " << doc.size << std::endl;
+        offset += doc.size; 
+    }
+    ofs.close();
+}
+int current_docid = 1;
+// 生成关键字文档：用jieba分词器
+void web_parse::output_keyword(std::vector<DocMeta> &docs) {
+    std::ofstream ofs(m_keyword_filepath, std::ios::app);
+    if (!ofs) {
+        std::cerr << "Error: Failed to open keyword file: " << m_keyword_filepath << std::endl;
+        return;
+    }
+
+    
+    for (const auto& doc : docs) {
+        std::vector<string> words;
+        m_tokenizer.Cut(doc.content, words);
+        
+        // 输出每个词并附加docid
+        for (const auto& word : words) {
+            string clean_word = trim(word);
+            if(!clean_word.empty() && !contains_non_chinese(clean_word)){
+                
+                ofs << clean_word << " " << current_docid << "\n";
+            }
+        }
+        
+        current_docid++;  // 处理下一篇文档时docid递增
+    }
+    ofs.close();
+}
+
+
+
+void web_parse::generate_files_from_list(const std::vector<std::string>& file_list) {
+    std::vector<DocMeta> all_docs;
+
+    for (const auto& path : file_list) {
+        auto docs = generate_unique_docs(path);
+        std::cout << path << ": parsed " << docs.size() << " docs" << std::endl;
+        all_docs.insert(all_docs.end(), docs.begin(), docs.end());
+    }
+
+    output_weblib(all_docs);
+    output_offset(all_docs);
+    output_keyword(all_docs);
+}
