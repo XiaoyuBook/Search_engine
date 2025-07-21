@@ -1,5 +1,7 @@
 #include "../include/web_parse.h"
 #include "../include/utils.h"
+#include <fstream>
+#include <utility>
 
 using std::string;
 
@@ -164,27 +166,61 @@ void web_parse::output_offset(std::vector<DocMeta> & docs){
 int current_docid = 1;
 // 生成关键字文档：用jieba分词器
 void web_parse::output_keyword(std::vector<DocMeta> &docs) {
+    using std::vector;
+    using std::map;
+    using std::pair;
+
+    int total_doc = docs.size();
+        // 记录关键词，关键词所在文档id和tf
+    map<string,vector<pair<int, double>>> tf_index;
+
+        // 记录单词在多少个文档中出现过
+    map<string, int> doc_freq;
+
+
+    for (const auto& doc : docs) {
+        std::vector<string> words;
+        m_tokenizer.Cut(doc.content,words);
+        
+        // 记录单个doc中word出现的次数
+        map<string, int> word_count;
+        int total = 0;
+        for(const auto & word: words) {
+            string clean_word = trim(word);
+            if(!clean_word.empty() && !contains_non_chinese(clean_word)) {
+                word_count[clean_word]++;
+                total++;
+            }
+        }
+
+
+        for(const auto & [word, freq] : word_count) {
+            double tf = static_cast<double>(freq) / total; 
+            tf_index[word].emplace_back(current_docid,tf);
+            doc_freq[word]++;
+        }
+
+        current_docid++;  // 处理下一篇文档时docid递增
+    }
+
+
+    // 开始计算tf-idf
     std::ofstream ofs(m_keyword_filepath, std::ios::app);
     if (!ofs) {
         std::cerr << "Error: Failed to open keyword file: " << m_keyword_filepath << std::endl;
         return;
     }
 
-    
-    for (const auto& doc : docs) {
-        std::vector<string> words;
-        m_tokenizer.Cut(doc.content, words);
-        
-        // 输出每个词并附加docid
-        for (const auto& word : words) {
-            string clean_word = trim(word);
-            if(!clean_word.empty() && !contains_non_chinese(clean_word)){
-                
-                ofs << clean_word << " " << current_docid << "\n";
-            }
+    for(const auto & [word, posting] : tf_index) {
+        int df = doc_freq[word];
+        double idf = log(static_cast<double>(total_doc)/ (df + 1));
+
+        ofs << word;
+        for(const auto [docid, tf] : posting ) {
+            double tfidf = tf*idf;
+            ofs << " " << docid << " " << tfidf;
         }
-        
-        current_docid++;  // 处理下一篇文档时docid递增
+        ofs << "\n";
     }
     ofs.close();
 }

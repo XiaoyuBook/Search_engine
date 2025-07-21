@@ -38,7 +38,6 @@ public:
     
     void output_keyword(std::vector<DocMeta> &docs);
 
-
     void generate_files_from_list(const std::vector<std::string>& file_list);
 
     std::vector<DocMeta> generate_unique_docs(const string& file_path); 

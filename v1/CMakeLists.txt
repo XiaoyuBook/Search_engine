@@ -8,7 +8,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 include_directories(include)
 
-add_executable(words_count 
+add_executable(outline_lib 
     src/main.cc
     src/file_scanner.cc
     src/file_parse.cc
