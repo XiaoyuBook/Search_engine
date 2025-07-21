@@ -1,6 +1,7 @@
 #include "../include/web_parse.h"
 #include "../include/utils.h"
 #include <fstream>
+#include <math.h>
 #include <utility>
 
 using std::string;
@@ -202,26 +203,45 @@ void web_parse::output_keyword(std::vector<DocMeta> &docs) {
 
         current_docid++;  // 处理下一篇文档时docid递增
     }
-
-
+    // 归一化准备
+    map<int, double> doc_norms;
     // 开始计算tf-idf
+    for(const auto & [word, posting] : tf_index) {
+        int df = doc_freq[word];
+        double idf = log(static_cast<double>(total_doc)/ (df + 1));
+
+        for(const auto [docid, tf] : posting ) {
+            double tfidf = tf*idf;
+            doc_norms[docid] += tfidf * tfidf;
+        }
+    }
+
+
+    // 平方和开根号
+    for(auto &[docid, weigh] :doc_norms  ) {
+        weigh = sqrt(weigh);
+    }
+
+
     std::ofstream ofs(m_keyword_filepath, std::ios::app);
     if (!ofs) {
         std::cerr << "Error: Failed to open keyword file: " << m_keyword_filepath << std::endl;
         return;
     }
 
-    for(const auto & [word, posting] : tf_index) {
+    for (const auto& [word, posting] : tf_index) {
         int df = doc_freq[word];
-        double idf = log(static_cast<double>(total_doc)/ (df + 1));
-
+        double idf = log(static_cast<double>(total_doc) / (df + 1));
+        
         ofs << word;
-        for(const auto [docid, tf] : posting ) {
-            double tfidf = tf*idf;
-            ofs << " " << docid << " " << tfidf;
+        for (const auto& [docid, tf] : posting) {
+            double tfidf = tf * idf;
+            double normalized_tfidf = tfidf / doc_norms[docid];
+            ofs << " " << docid << " " << normalized_tfidf;
         }
         ofs << "\n";
     }
+
     ofs.close();
 }
 

@@ -17,4 +17,4 @@ add_executable(outline_lib
 
 find_package(tinyxml2 REQUIRED)   # 找系统安装的tinyxml2
 
-target_link_libraries(words_count PRIVATE tinyxml2)  # 链接tinyxml2库
+target_link_libraries(outline_lib PRIVATE tinyxml2)  # 链接tinyxml2库
