@@ -13,8 +13,8 @@ int main() {
     file_parse cn(cn_filename,"./cnoutput.txt");
     cn.start(1);
     cn.file_filter("../stopwords/cn_stopwords.txt", TYPE_CN);
-    cn.count_words("dict_cn");
-    cn.create_index("dict_cn", "index_cn");
+    cn.count_words("dict_cn.txt");
+    cn.create_index("dict_cn.txt", "index_cn.txt");
 
    file_scanner web_scanner("../corpus/webpages");
    web_scanner.start();

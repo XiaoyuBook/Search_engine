@@ -66,7 +66,7 @@ void Eventloop::wait_epollfd() {
         cerr << "nready == -1" << endl;
         return;
     } else if(nready == 0) {
-        cout << " epoll_wait timeout!" << endl;
+        // cout << " epoll_wait timeout!" << endl;
     } else {
         // 如果满载
         if((int)m_ready_epfd_list.size() == nready) {
