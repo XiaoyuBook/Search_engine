@@ -1,11 +1,16 @@
 # Search_engine
-## v1 离线库准备
+## v1：离线库准备
 ### 准备工作
-> 解压lib中的两个文件
-> #### jieba工具包
+> 解压完lib的文件后
+> #### cppjieba的安装
 > 1. mv ./cppjieba/include/cppjieba /usr/local/include/
-> 2. mv ./cppjieba/deps/limonp/include/limonp /usr/local/include/cppjieba
-> #### utf8
+> 2. mv ./cppjieba/deps/limonp/include/limonp /usr/local/include/
+> #### utfcpp的安装
+> ```shell
+> tar xzvf utfcpp-4.0.6.tar.gz 
+> mv ./utfcpp-4.0.6/source/* /usr/local/include/utfcpp
+> ```
+> #### simhash的安装
 > tar xzvf simhash-1.3.0.tar.gz
 > sudo mv ./simhash-1.3.0/include/* /usr/local/include
 > #### tinyxml2的安装
@@ -26,12 +31,12 @@
 > ./outline_lib
 > ```
 
-## v2网页搜索
+## v2：网页搜索
 ### 模块一：关键字推荐
 > 相应模块放在了candidate_seacher.cc
 ### 模块二：网页搜索
 > 相应模块放在了web_searcher.cc
-> 使用说明
+### 使用说明
 > #### 服务端：
 > 进入v2/Server
 > ```shell
@@ -45,3 +50,5 @@
 > g++ client.cc -o client
 > ./client 127.0.0.1 8888
 > ```
+
+## v3：LRUCache的实现
