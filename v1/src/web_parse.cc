@@ -114,7 +114,6 @@ std::vector<DocMeta> web_parse::generate_unique_docs(const string& file_path) {
         }
         if (!is_duplicate) {
             simhash_set.insert(hashcode);
-            meta.size = 11 + meta.content.size() + 7;
             docs.push_back(meta);
             unique_docs++;
         }
@@ -129,41 +128,49 @@ std::vector<DocMeta> web_parse::generate_unique_docs(const string& file_path) {
 
 
 
-int doc_id = 1;
+
 // 生成网页库文件
-void web_parse::output_weblib(std::vector<DocMeta> & docs){ 
-    std::ofstream ofs(m_weblib_filepath);
-    if (!ofs) {
+void web_parse::output_weblib_and_offset(std::vector<DocMeta> &docs) {
+    std::ofstream ofs_weblib(m_weblib_filepath);
+    std::ofstream ofs_offset(m_offset_filepath);
+
+    if (!ofs_weblib) {
         std::cerr << "Error: Failed to open weblib file: " << m_weblib_filepath << std::endl;
         return;
     }
-
-        for (const auto& doc : docs) {
-            ofs << "<doc>\n";
-            ofs << "  <docid>" << doc_id++ << "</docid>\n";
-            ofs << "  <title>" << doc.title << "</title>\n";
-            ofs << "  <link>" << doc.link << "</link>\n";
-            ofs << "  <content>" << doc.content << "</content>\n";
-            ofs << "</doc>\n\n";
-        }
-    ofs.close();
-}
-
-// 生成偏移文件
-void web_parse::output_offset(std::vector<DocMeta> & docs){
-    std::ofstream ofs(m_offset_filepath);
-    if (!ofs) {
+    if (!ofs_offset) {
         std::cerr << "Error: Failed to open offset file: " << m_offset_filepath << std::endl;
         return;
     }
-    int doc_id = 1;
+
+    int docid = 1;
     size_t offset = 0;
+
     for (const auto& doc : docs) {
-        ofs << doc_id++ <<" "<< offset  << " " << doc.size << std::endl;
-        offset += doc.size; 
+        std::ostringstream oss;
+        oss << "<doc>\n";
+        oss << "  <docid>" << docid << "</docid>\n";
+        oss << "  <title>" << doc.title << "</title>\n";
+        oss << "  <link>" << doc.link << "</link>\n";
+        oss << "  <content>" << doc.content << "</content>\n";
+        oss << "</doc>\n";
+
+        std::string doc_str = oss.str();
+        size_t size = doc_str.size();
+
+        ofs_offset << docid << " " << offset << " " << (offset + size) << "\n";
+
+        // 写入weblib
+        ofs_weblib << doc_str;
+
+        offset += size;
+        ++docid;
     }
-    ofs.close();
+
+    ofs_weblib.close();
+    ofs_offset.close();
 }
+
 int current_docid = 1;
 // 生成关键字文档：用jieba分词器
 void web_parse::output_keyword(std::vector<DocMeta> &docs) {
@@ -255,8 +262,6 @@ void web_parse::generate_files_from_list(const std::vector<std::string>& file_li
         std::cout << path << ": parsed " << docs.size() << " docs" << std::endl;
         all_docs.insert(all_docs.end(), docs.begin(), docs.end());
     }
-
-    output_weblib(all_docs);
-    output_offset(all_docs);
+    output_weblib_and_offset(all_docs);
     output_keyword(all_docs);
 }

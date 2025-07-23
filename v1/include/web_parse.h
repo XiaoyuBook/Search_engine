@@ -32,9 +32,8 @@ public:
 
     void start();
 
-    void output_offset(std::vector<DocMeta> & docs);
+    void output_weblib_and_offset(std::vector<DocMeta> &docs);
 
-    void output_weblib(std::vector<DocMeta> & docs);
     
     void output_keyword(std::vector<DocMeta> &docs);
 

@@ -17,16 +17,30 @@ void MyTask::process() {
     const string stopwords_path = "../../../v1/stopwords/cn_stopwords.txt";
     const string candidate_idx_path = "../../../v1/bin/index_cn.txt";
     const string dict_path = "../../../v1/bin/dict_cn.txt";
+    const string weblib_path = "../../../v1/bin/weblib.txt";
+    const string offset_path = "../../../v1/bin/offset.txt";
     const int top_k = 5;
 
     json response;
-
+    
     if (m_type == 0x0001) { // web_searcher
-        web_searcher doc_searcher(m_msg, web_idx_path);
-        auto doc_results = doc_searcher.search_topk(top_k, stopwords_path);
+        web_searcher doc_searcher(
+            m_msg, 
+            web_idx_path,
+            weblib_path,
+            offset_path,
+            stopwords_path
+        );
+        // 获取排序后的网页内容
+        auto doc_contents = doc_searcher.output(top_k);
+        
+        // 构建包含网页内容的响应
         json docs_json = json::array();
-        for (const auto& [docid, score] : doc_results) {
-            docs_json.push_back({{"docid", docid}, {"similarity", score}});
+        for (size_t i = 0; i < doc_contents.size(); ++i) {
+            docs_json.push_back({
+                {"index", i + 1},
+                {"content", doc_contents[i]}
+            });
         }
         response["documents"] = docs_json;
         m_con->send_tlv(0x1001, response.dump(2));

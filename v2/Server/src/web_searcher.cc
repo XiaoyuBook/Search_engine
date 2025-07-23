@@ -1,15 +1,27 @@
 #include "../include/web_searcher.h"
+#include <cstddef>
 #include <fstream>
 #include <sstream>
 #include <cmath>
+#include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
 
 using json = nlohmann::json;
 
-web_searcher::web_searcher(const std::string& msg, const std::string& idxpath)
-    : m_msg(msg), m_idxpath(idxpath),
-      m_tokenizer() {}
+web_searcher::web_searcher(
+    const std::string& msg, 
+    const std::string& idx_path,
+    const std::string& weblib_path,
+    const std::string& offset_path,
+    const std::string& stopwords_path
+)
+    : m_msg(msg), 
+    m_idx_path(idx_path),
+    m_weblib_path(weblib_path),
+    m_offset_path(offset_path),
+    m_stopwords_path(stopwords_path),
+    m_tokenizer() {}
 
 // 切分用户发来的信息
 void web_searcher::cut_keywords() {
@@ -17,8 +29,8 @@ void web_searcher::cut_keywords() {
 }
 
 // 过滤停用词
-void web_searcher::filter_stopwords(const std::string& stopwords_path) {
-    std::ifstream ifs(stopwords_path);
+void web_searcher::filter_stopwords() {
+    std::ifstream ifs(m_stopwords_path);
     std::unordered_set<std::string> stopwords;
     std::string word;
     while (ifs >> word) {
@@ -59,7 +71,7 @@ std::map<std::string, double> web_searcher::compute_base_weight() {
 }
 // 寻找全部文档
 std::unordered_map<int, std::vector<std::pair<std::string, double>>>web_searcher::search_containing_docs() {
-    std::ifstream ifs(m_idxpath);
+    std::ifstream ifs(m_idx_path);
     std::string line;
     std::unordered_map<std::string, std::vector<std::pair<int,double>>> reverse_idx;
     // 倒插索引库读取到内存
@@ -132,32 +144,90 @@ std::vector<std::pair<int, double>> web_searcher::rank_documents_by_cosine(
     return results;
 }
 
+// 读取计算好相似度后的结果，并通过这个结果得到docid，再用docid读取offset
+std::unordered_map<int,std::pair<size_t,size_t>> web_searcher::get_offset_by_docid(const std::vector<std::pair<int, double>> & temp) {
+    std::unordered_map<int, std::pair<size_t,size_t>> offset_map;
+    std::ifstream ifs(m_offset_path);
+
+    if (!ifs) {
+        std::cerr << "Error opening offset file: " << m_offset_path << std::endl;
+        return offset_map;
+    }
+    int docid;
+    size_t start,end;
+    while (ifs>>docid >> start >> end) {
+        offset_map[docid] = {start, end};
+    }
+    for(auto [key,value] : offset_map){
+        std::cout << "docid:" << key << "  start: " << value.first << "  end:" << value.second << std::endl;
+    }
+    return offset_map;
+}
+
+// 读取offset_map和余弦排序好的进行获取content并排序
+std::vector<string> web_searcher::get_content_by_docid (
+    const std::unordered_map<int,std::pair<size_t,size_t>>& map,
+    std::vector<std::pair<int, double>>& rank) {
+        vector<string> content;
+        std::ifstream ifs(m_weblib_path);
+    for(auto [docid,_] : rank) {
+        auto it = map.find(docid);
+        if(it != map.end()) {
+            size_t start = it->second.first;
+            size_t length = it->second.second - start;
+            ifs.seekg(start);
+            string document(length,'\0');
+            ifs.read(&document[0],length);
+
+
+            // 提取<content>部分
+            size_t content_start = document.find("<content>");
+            if(content_start == string::npos) {
+                std::cerr << "not found this content" << std::endl;
+                continue;
+            }
+            content_start += 9;
+            size_t content_end = document.find("</content>");
+            if(content_end == string::npos) {
+                std::cerr << "not found this content" << std::endl;
+                continue;
+            }
+
+            content.push_back(document.substr(content_start,content_end-content_start));
+
+        }
+    }
+    return content;
+}
+
 
 // 汇总
-std::vector<std::pair<int, double>> web_searcher::search_topk(int k, const std::string& stopwords_path) {
-    // 1. 分词
+std::vector<string> web_searcher::output(int k) {
+    // 分词
     cut_keywords();
-    // 2. 过滤停用词
-    filter_stopwords(stopwords_path);
+    // 过滤停用词
+    filter_stopwords();
     // 如果没有关键词，直接返回空
     if (m_wordarry.empty()) {
         return {};
     }
-    // 3. 计算基准向量
-    std::map<std::string, double> base_w = compute_base_weight();
+    // 计算基准向量
+    std::map<std::string, double> base_weight = compute_base_weight();
 
-    // 4. 查询包含所有关键词的文档
+    // 查询包含所有关键词的文档
     auto doc_keywords = search_containing_docs();
     if (doc_keywords.empty()) {
         return {};
     }
-    // 5. 计算余弦相似度并排序
-    auto ranked = rank_documents_by_cosine(base_w, doc_keywords);
-    // 6. 返回前k个
-    if (ranked.size() > static_cast<size_t>(k)) {
-        ranked.resize(k);
-    }
-    return ranked;
+    // 计算余弦相似度并排序
+    auto ranked_docs = rank_documents_by_cosine(base_weight, doc_keywords);
+
+    // 获取偏移值
+    auto offset_map = get_offset_by_docid(ranked_docs);
+
+    auto contents = get_content_by_docid(offset_map, ranked_docs);
+
+    return contents;
 }
 
 
