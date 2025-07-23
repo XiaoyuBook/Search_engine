@@ -1,18 +1,23 @@
 # Search_engine
 ## v1：离线库准备
 ### 准备工作
-> 解压完lib的文件后
+> 进入lib文件夹
 > #### cppjieba的安装
-> 1. mv ./cppjieba/include/cppjieba /usr/local/include/
-> 2. mv ./cppjieba/deps/limonp/include/limonp /usr/local/include/
+>  ```shell
+>  unzip cppjieba.zip  
+>  sudo mv ./cppjieba/include/cppjieba /usr/local/include/
+>  sudo mv ./cppjieba/deps/limonp/include/limonp /usr/local/include/
+》 ```
 > #### utfcpp的安装
 > ```shell
 > tar xzvf utfcpp-4.0.6.tar.gz 
-> mv ./utfcpp-4.0.6/source/* /usr/local/include/utfcpp
+> sudo mv ./utfcpp-4.0.6/source/* /usr/local/include/utfcpp
 > ```
 > #### simhash的安装
+> ```shell
 > tar xzvf simhash-1.3.0.tar.gz
 > sudo mv ./simhash-1.3.0/include/* /usr/local/include
+> ```
 > #### tinyxml2的安装
 > ```shell
 > unzip tinyxml2-master.zip && cd ./tinyxml2-master/
@@ -52,3 +57,4 @@
 > ```
 
 ## v3：LRUCache的实现
+> 对比v2使用方法相同，增加了LRUCache.cc和Main_cache.cc来实现缓存机制

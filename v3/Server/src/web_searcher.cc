@@ -227,6 +227,7 @@ std::vector<string> web_searcher::output(int k) {
     if (k > 0 && contents.size() > static_cast<size_t>(k)) {
         contents.resize(k);
     }
+
     return contents;
 }
 

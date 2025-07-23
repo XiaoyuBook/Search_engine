@@ -67,10 +67,8 @@ m_server(ip,port){
 Search_server::~Search_server(){}
 
 
-void Search_server::start()
-{
+void Search_server::start() {
     m_pool.start();
-    //function<void(const TcpConnectionPtr &)>
     using namespace std::placeholders;
     m_server.set_all_callback(std::bind(&Search_server::on_new_connection, this, _1)
                            , std::bind(&Search_server::on_message, this, _1)
@@ -78,19 +76,17 @@ void Search_server::start()
     m_server.start();
 
 }
-void Search_server::stop()
-{
+void Search_server::stop() {
     m_pool.stop();
     m_server.stop();
 }
 
 //三个回调
-void Search_server::on_new_connection(const Tcp_connection_ptr &con)
-{
+void Search_server::on_new_connection(const Tcp_connection_ptr &con) {
     std::cout << con->to_string() << " has connected!!!" << std::endl;
 }
 
-void Search_server::on_message(const Tcp_connection_ptr &con){
+void Search_server::on_message(const Tcp_connection_ptr &con) {
     auto [type, value] = con->receive_tlv(); // 解包TLV
     std::cout << ">> Received TLV. Type: " << type << ", Value: " << value << std::endl;
 
@@ -98,8 +94,7 @@ void Search_server::on_message(const Tcp_connection_ptr &con){
     m_pool.add_task(std::bind(&MyTask::process, task));
 }
 
-void Search_server::on_close(const Tcp_connection_ptr &con)
-{
+void Search_server::on_close(const Tcp_connection_ptr &con) {
     std::cout << con->to_string() << " has close!!!" << std::endl;
 
 }
