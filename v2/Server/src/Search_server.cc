@@ -9,43 +9,37 @@
 
 using json = nlohmann::json;
 
-MyTask::MyTask(const std::string& msg, const std::shared_ptr<Tcp_connection>& con)
-    : m_msg(msg), m_con(con)  // 初始化列表必须正确赋值成员变量
-{
-    // 可选：构造时的初始化逻辑
-}
+MyTask::MyTask(uint16_t type, const std::string& value, const std::shared_ptr<Tcp_connection>& con)
+    : m_type(type), m_msg(value), m_con(con) {}
 
-// 任务处理：执行搜索并返回结果
 void MyTask::process() {
-    // 1. 配置文件路径（根据实际项目结构调整，确保能找到索引/字典/停用词文件）
-    const std::string web_idx_path = "../../../v1/bin/keywords.txt";       // web_searcher的索引文件
-    const std::string stopwords_path = "../../../v1/stopwords/cn_stopwords.txt"; // 停用词文件
-    const std::string candidate_idx_path = "../../../v1/bin/index_cn.txt"; // 候选词索引
-    const std::string dict_path = "../../../v1/bin/dict_cn.txt";           // 候选词字典
-    const int top_k = 5; // 返回前5条结果
+    const string web_idx_path = "../../../v1/bin/keywords.txt";
+    const string stopwords_path = "../../../v1/stopwords/cn_stopwords.txt";
+    const string candidate_idx_path = "../../../v1/bin/index_cn.txt";
+    const string dict_path = "../../../v1/bin/dict_cn.txt";
+    const int top_k = 5;
 
-    // 2. 网页搜索：使用web_searcher获取相关文档
-    web_searcher doc_searcher(m_msg, web_idx_path);
-    auto doc_results = doc_searcher.search_topk(top_k, stopwords_path);
-
-    // 3. 候选词推荐：使用candidate_searcher获取候选词
-    candidate_searcher candidate_searcher(m_msg, candidate_idx_path, dict_path);
-    auto candidate_results = candidate_searcher.search(top_k);
-
-    // 4. 构造返回的JSON结果
     json response;
-    // 整理文档搜索结果
-    json docs_json = json::array();
-    for (const auto& [docid, score] : doc_results) {
-        docs_json.push_back({{"docid", docid}, {"similarity", score}});
-    }
-    response["documents"] = docs_json;
-    // 整理候选词结果（candidate_searcher已返回json数组）
-    response["candidates"] = candidate_results;
 
-    // 5. 将JSON结果发送给客户端
-    std::string response_str = response.dump(2); // 格式化JSON，便于阅读
-    m_con->send_inloop(response_str);
+    if (m_type == 0x0001) { // web_searcher
+        web_searcher doc_searcher(m_msg, web_idx_path);
+        auto doc_results = doc_searcher.search_topk(top_k, stopwords_path);
+        json docs_json = json::array();
+        for (const auto& [docid, score] : doc_results) {
+            docs_json.push_back({{"docid", docid}, {"similarity", score}});
+        }
+        response["documents"] = docs_json;
+        m_con->send_tlv(0x1001, response.dump(2));
+    }
+    else if (m_type == 0x0002) { // candidate_searcher
+        candidate_searcher candidate_searcher(m_msg, candidate_idx_path, dict_path);
+        auto candidate_results = candidate_searcher.search(top_k);
+        response["candidates"] = candidate_results;
+        m_con->send_tlv(0x1002, response.dump(2));
+    }
+    else {
+        m_con->send_tlv(0xFFFF, "Unknown request type.");
+    }
 }
 
 
@@ -82,12 +76,11 @@ void Search_server::on_new_connection(const Tcp_connection_ptr &con)
     std::cout << con->to_string() << " has connected!!!" << std::endl;
 }
 
-void Search_server::on_message(const Tcp_connection_ptr &con)
-{
-    string msg = con->receive();
-    std::cout << ">>recv msg from client: " << msg << std::endl;
+void Search_server::on_message(const Tcp_connection_ptr &con){
+    auto [type, value] = con->receive_tlv(); // 解包TLV
+    std::cout << ">> Received TLV. Type: " << type << ", Value: " << value << std::endl;
 
-    MyTask task(msg, con);
+    MyTask task(type, value, con);
     m_pool.add_task(std::bind(&MyTask::process, task));
 }
 

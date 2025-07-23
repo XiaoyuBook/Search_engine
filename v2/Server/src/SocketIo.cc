@@ -16,28 +16,27 @@ SocketIo::~SocketIo(){
 
 }
 
+// 读取固定字节数，返回实际读取长度（-1表示错误）
 int SocketIo::readn(char *buf, int len) {
     int left = len;
-    char *pstr = buf;
-    int ret = 0;
-
-    while(left > 0) {
-        ret = read(m_fd, pstr, left);
-        if(ret == -1 && errno == EINTR) {
-            continue;
-        } else if (ret == -1) {
-            std::cerr << " read error" << std::endl;
-            return -1;
-        } else if(ret == 0) {
+    char *p = buf;
+    while (left > 0) {
+        ssize_t ret = ::read(m_fd, p, left);
+        if (ret == -1) {
+            if (errno == EINTR) {  // 被信号中断，重试
+                continue;
+            } else {  // 其他错误
+                std::cerr << "read error: " << strerror(errno) << std::endl;
+                return -1;
+            }
+        } else if (ret == 0) {  // 连接关闭
             break;
-        } else {
-            pstr += ret;
-            left -= ret;
         }
+        left -= ret;
+        p += ret;
     }
-    return len - left;
+    return len - left;  // 返回实际读取的字节数
 }
-
 
 int SocketIo::readline(char *buf, int len) {
     int left = len -1;

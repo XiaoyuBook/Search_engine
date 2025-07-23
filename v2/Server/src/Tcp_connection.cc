@@ -22,6 +22,26 @@ Tcp_connection::~Tcp_connection() {
 
 }
 
+// tlv
+void Tcp_connection::send_tlv(uint16_t type, const std::string& value) {
+    uint32_t length = value.size();
+    std::string packet;
+    packet.append(reinterpret_cast<const char*>(&type), sizeof(type));
+    packet.append(reinterpret_cast<const char*>(&length), sizeof(length));
+    packet.append(value);
+    send(packet);  // 复用原 send 函数
+}
+
+std::pair<uint16_t, std::string> Tcp_connection::receive_tlv() {
+    uint16_t type;
+    uint32_t length;
+    m_sockIo.readn(reinterpret_cast<char*>(&type), sizeof(type));
+    m_sockIo.readn(reinterpret_cast<char*>(&length), sizeof(length));
+    std::string value(length, '\0');
+    m_sockIo.readn(&value[0], length);
+    return {type, value};
+}
+// 
 void Tcp_connection::send(const string & msg) {
     m_sockIo.writen(msg.c_str(), msg.size());
 }

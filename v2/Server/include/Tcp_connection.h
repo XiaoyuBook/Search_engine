@@ -20,6 +20,10 @@ class Tcp_connection:public std::enable_shared_from_this<Tcp_connection>{
 
 
 public:
+    // tlv新加
+    void send_tlv(uint16_t type, const std::string& value);
+    std::pair<uint16_t, std::string> receive_tlv();
+    // tlv
     explicit Tcp_connection(int fd, Eventloop *loop);
     ~Tcp_connection();
     void send(const string &msg);

@@ -17,12 +17,15 @@ public:
 private:
     string m_msg;
     string m_idxpath;
+    string m_libpath;
     cppjieba::Jieba m_tokenizer;
     vector<string> m_wordarry;
+
 
     void cut_keywords();
     void filter_stopwords(const string& stopwords_path);
     std::map<string, double> compute_base_weight();
     std::unordered_map<int, vector<std::pair<string, double>>> search_containing_docs();
     vector<std::pair<int, double>> rank_documents_by_cosine(const std::map<string, double>& base_weight, const std::unordered_map<int, vector<std::pair<string, double>>>& doc_keywords);
+
 };

@@ -4,16 +4,20 @@
 #include <cstddef>
 
 
+#include <string>
+#include <memory>
+#include "Tcp_connection.h"
+
 class MyTask {
-public:
-    MyTask(const string & msg, const Tcp_connection_ptr &con);
-    void process();
-
-private:
-    string m_msg;
-    Tcp_connection_ptr m_con;
-};
-
+    public:
+        MyTask(uint16_t type, const std::string& value, const std::shared_ptr<Tcp_connection>& con);
+        void process(); // 执行任务
+    
+    private:
+        uint16_t m_type;
+        std::string m_msg;
+        std::shared_ptr<Tcp_connection> m_con;
+    };
 class Search_server{
 public:
     Search_server(size_t thread_num, size_t queue_size, const string &ip, unsigned short port);

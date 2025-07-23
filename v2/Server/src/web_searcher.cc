@@ -64,7 +64,7 @@ std::unordered_map<int, std::vector<std::pair<std::string, double>>>web_searcher
     std::unordered_map<std::string, std::vector<std::pair<int,double>>> reverse_idx;
     // 倒插索引库读取到内存
     while(getline(ifs,line)) {
-        std::istringstream iss(line);
+        std::istringstream iss(line);   
         std::string keyword;
         int docid;
         double weight;
@@ -131,6 +131,7 @@ std::vector<std::pair<int, double>> web_searcher::rank_documents_by_cosine(
     });
     return results;
 }
+
 
 // 汇总
 std::vector<std::pair<int, double>> web_searcher::search_topk(int k, const std::string& stopwords_path) {
