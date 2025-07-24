@@ -15,6 +15,6 @@ add_executable(outline_lib
     src/web_parse.cc
 )
 
-find_package(tinyxml2 REQUIRED)   # 找系统安装的tinyxml2
+find_package(tinyxml2 REQUIRED) 
 
-target_link_libraries(outline_lib PRIVATE tinyxml2)  # 链接tinyxml2库
+target_link_libraries(outline_lib PRIVATE tinyxml2) 

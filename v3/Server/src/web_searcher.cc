@@ -138,9 +138,12 @@ std::vector<std::pair<int, double>> web_searcher::rank_documents_by_cosine(
         }
         results.emplace_back(docid, dot);
     }
-    std::sort(results.begin(), results.end(), [](const auto& a, const auto& b) {
+    std::sort(results.begin(), results.end(), 
+    [](const std::pair<int, double>& a, const std::pair<int, double>& b) {
         return a.second > b.second;
-    });
+    }
+);
+
     return results;
 }
 
@@ -231,25 +234,3 @@ std::vector<string> web_searcher::output(int k) {
     return contents;
 }
 
-
-
-// int main() {
-//     std::string query = "从《故宫日历》成为“网红”到《国家宝藏》《唐宫夜宴》和三星堆的“出圈”，每一年，博物馆和公众似乎又走近了一些。今年国际博物馆日的主题为“博物馆的未来：恢复与重塑”，后疫情时代，博物馆“出圈”之后的路该如何走，怎样让传统接续未来，期待从业者开启新思考、探索新模式、提出新方案，让传统文化更好地抵达公众";
-//     std::string idx_path = "../../../v1/bin/keywords.txt";
-//     std::string stopwords_path = "../../../v1/stopwords/cn_stopwords.txt";
-
-//     web_searcher searcher(query, idx_path);
-//     int top_k = 5;
-//     auto results = searcher.search_topk(top_k, stopwords_path);
-
-//     if (results.empty()) {
-//         std::cout << "没有找到包含所有关键字的相关文档" << std::endl;
-//     } else {
-//         std::cout << "Top " << top_k << " 相关文档（docid, 余弦相似度）：" << std::endl;
-//         for (const auto& [docid, score] : results) {
-//             std::cout << "DocID: " << docid << ", Score: " << score << std::endl;
-//         }
-//     }
-
-//     return 0;
-// }

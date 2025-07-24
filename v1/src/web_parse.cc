@@ -30,14 +30,14 @@ string strip_tags(const string& input) {
 string extract_p(const string& html) {
     using namespace std;
     string result;
-    regex p_regex("<p[^>]*>(.*?)</p>", regex::icase); // 匹配所有<p>...</p>
+    regex p_regex("<p[^>]*>(.*?)</p>", regex::icase); 
     auto begin = sregex_iterator(html.begin(), html.end(), p_regex);
     auto end = sregex_iterator();
 
     for (auto it = begin; it != end; ++it) {
-        string inner = it->str(1); // 提取 p 内的内容
-        if (inner.find("<img") != string::npos) continue; // 跳过包含图片的 p
-        result += strip_tags(inner); // 去掉内部的 <span> 等标签
+        string inner = it->str(1);
+        if (inner.find("<img") != string::npos) continue;
+        result += strip_tags(inner); 
         result += "\n";
     }
 

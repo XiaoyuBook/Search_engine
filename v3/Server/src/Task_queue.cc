@@ -46,20 +46,15 @@ ElemType Task_queue::pop() {
 
 
 
-bool Task_queue::empty() const
-{
-    /* return _que.empty(); */
+bool Task_queue::empty() const {
     return m_queue.size() == 0;
 }
 
-bool Task_queue::full() const
-{
+bool Task_queue::full() const {
     return m_queue.size() == m_capacity;
 }
 
-//将所有等待在非空条件变量上的线程唤醒
-void Task_queue::wakeup()
-{
+void Task_queue::wakeup() {
     m_flag = false;
     m_notempty.notify_all();
 }

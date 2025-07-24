@@ -16,26 +16,26 @@ SocketIo::~SocketIo(){
 
 }
 
-// 读取固定字节数，返回实际读取长度（-1表示错误）
+
 int SocketIo::readn(char *buf, int len) {
     int left = len;
     char *p = buf;
     while (left > 0) {
         ssize_t ret = ::read(m_fd, p, left);
         if (ret == -1) {
-            if (errno == EINTR) {  // 被信号中断，重试
+            if (errno == EINTR) {  
                 continue;
-            } else {  // 其他错误
+            } else { 
                 std::cerr << "read error: " << strerror(errno) << std::endl;
                 return -1;
             }
-        } else if (ret == 0) {  // 连接关闭
+        } else if (ret == 0) { 
             break;
         }
         left -= ret;
         p += ret;
     }
-    return len - left;  // 返回实际读取的字节数
+    return len - left;  
 }
 
 int SocketIo::readline(char *buf, int len) {
@@ -48,16 +48,15 @@ int SocketIo::readline(char *buf, int len) {
         if(ret == -1) {
             if(errno == EINTR) {
                 continue;
-            } else if(errno == EAGAIN) { // 非阻塞下无数据，退出等待
+            } else if(errno == EAGAIN) {
                 break;
             } else {
                 std::cerr << "readline error: " << strerror(errno) << std::endl;
                 return -1;
             }
         } else if(ret == 0) {
-            break; // 连接关闭
+            break; 
         } else {
-            // 查找换行符（现有逻辑保留）
             for(int idx = 0; idx < ret; idx++) {
                 if(pstr[idx] == '\n') {
                     int sz = idx +1;
@@ -67,7 +66,6 @@ int SocketIo::readline(char *buf, int len) {
                     return total + sz;
                 }
             }
-            // 未找到换行符，读取所有数据
             readn(pstr, ret);
             total += ret;
             pstr += ret;

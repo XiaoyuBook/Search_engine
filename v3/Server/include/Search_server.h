@@ -11,7 +11,7 @@
 class MyTask {
     public:
         MyTask(uint16_t type, const std::string& value, const std::shared_ptr<Tcp_connection>& con);
-        void process(); // 执行任务
+        void process(); 
     
     private:
         uint16_t m_type;

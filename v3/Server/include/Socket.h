@@ -2,7 +2,7 @@
 
 #include "Non_copyable.h"
 
-class Socket : Non_copyable{
+class Socket : Non_copyable {
 public:
     Socket();
     ~Socket();

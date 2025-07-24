@@ -4,17 +4,27 @@
 #include <iostream>
 #include <functional>
 #include <mutex>
+#include "nlohmann/json.hpp"
+// 功能模块
 #include "../include/web_searcher.h"
 #include "../include/candidate_searcher.h"
-#include "nlohmann/json.hpp"
-#include "LRUCache.cc"
-#include "Main_cache.cc"
+
+// LRU缓存相关
+#include "../include/LRUCache.h"
+#include "../include/main_cache.h"
+#include "../include/patch_register.h"
+
+
+
 using json = nlohmann::json;
 
 
-// 全局变量：主控cache
-static Main_cache<std::string, std::vector<string>> web_main_cache;
-static Main_cache<std::string, std::vector<json>> candidate_main_cache;
+
+
+extern Main_cache<std::string, std::vector<string>> web_main_cache;
+extern Main_cache<std::string, std::vector<json>> candidate_main_cache;
+
+
 MyTask::MyTask(uint16_t type, const std::string& value, const std::shared_ptr<Tcp_connection>& con)
     : m_type(type), m_msg(value), m_con(con) {}
 
@@ -33,6 +43,7 @@ void MyTask::process() {
     if (m_type == 0x0001) { 
         vector<string> doc_contents;
         thread_local LRUCache<string,vector<string>> web_cache(10);
+        first_cache_register(&web_cache);
         static mutex cache_mutex;
             if(web_cache.get(m_msg, doc_contents)) {
                 std::cout << "lower cache hit" << std::endl;
@@ -65,18 +76,10 @@ void MyTask::process() {
         m_con->send_tlv(0x1001, response.dump(2));
 
 
-        
-        auto dirty_keys = web_cache.take_dirty_keys();
-        for (const auto& key : dirty_keys) {
-            std::vector<std::string> val;
-            if (web_cache.get_cache(key, val)) {
-                web_main_cache.put(key, val);
-                std::cout << " key: " << key << " patched to Web_main_cache." << std::endl;
-            }
-        }
     }
     else if (m_type == 0x0002) { 
         thread_local LRUCache<std::string, std::vector<json>> candidate_cache(10);  
+        first_cache_register(&candidate_cache);
         vector<json> candidate_results;
 
             if(candidate_cache.get(m_msg, candidate_results)) {
@@ -95,15 +98,6 @@ void MyTask::process() {
         response["candidates"] = candidate_results;
         m_con->send_tlv(0x1002, response.dump(2));
 
-        
-        auto dirty_keys = candidate_cache.take_dirty_keys();
-        for (const auto& key : dirty_keys) {
-            std::vector<json> val;
-            if (candidate_cache.get_cache(key, val)) {
-                candidate_main_cache.put(key, val);
-                std::cout << " key: " << key << " patched to candidate_main_cache." << std::endl;
-            }
-        }
     }
     else {
         m_con->send_tlv(0xFFFF, "Unknown request type.");

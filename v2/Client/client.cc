@@ -47,8 +47,8 @@ pair<uint16_t, string> decode_tlv(int sockfd) {
 }
 
 int main() {
-    const char *server_ip = "127.0.0.1"; // 改成你的服务端地址
-    const int server_port = 8888;        // 改成你的端口
+    const char *server_ip = "127.0.0.1";
+    const int server_port = 8888;      
 
     // 创建socket
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);

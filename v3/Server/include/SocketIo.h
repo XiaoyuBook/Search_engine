@@ -1,6 +1,6 @@
 #pragma once
 
-class SocketIo{
+class SocketIo {
 public:
     explicit SocketIo(int fd);
     ~SocketIo();

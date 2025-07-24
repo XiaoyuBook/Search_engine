@@ -2,12 +2,12 @@
 
 Tcp_server::Tcp_server(const string &ip, unsigned short port):
 m_acceptor(ip,port),
-m_loop(m_acceptor){
+m_loop(m_acceptor) {
 
 }
 
 
-Tcp_server::~Tcp_server(){
+Tcp_server::~Tcp_server() {
 
 }
 
