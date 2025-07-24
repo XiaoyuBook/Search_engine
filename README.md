@@ -7,7 +7,7 @@
 >  unzip cppjieba.zip  
 >  sudo mv ./cppjieba/include/cppjieba /usr/local/include/
 >  sudo mv ./cppjieba/deps/limonp/include/limonp /usr/local/include/
-》 ```
+>  ```
 > #### utfcpp的安装
 > ```shell
 > tar xzvf utfcpp-4.0.6.tar.gz 
@@ -60,7 +60,7 @@
 > 实现了每个低级cache向主cache进行每隔30s打补丁更新
 > 对比v2使用方法相同，增加了LRUCache和main_cache来实现缓存机制,然后使用patch_register来完成同步打补丁
 
-## 提示：为了简化代码，使用了C++17的auto 引用,如 for (const auto& [key, value] : map),如果想用C++11则需要换成.first和.second
+## 提示：为了简化代码，使用了C++17的auto 引用,如 for (const auto& [key, value] : map),可直接使用key和value，如果想用C++11则需要换成.first和.second
 
 
 
